@@ -1,68 +1,79 @@
 """
-Main Flask application for AgenticFlow.
+Main FastAPI application for AgenticFlow.
 
 This module serves as the entry point for the AgenticFlow API.
 """
 import os
-from flask import Flask, jsonify
-from flask_jwt_extended import JWTManager
-from flask_cors import CORS
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
-# Import database models first to avoid circular imports
-from database import models
+# Import routers
+from api.auth_endpoints import router as auth_router
+from api.email_endpoints import router as email_router
+from api.social_endpoints import router as social_router
+from api.newsletter_endpoints import router as newsletter_router
 
-# Import blueprints
-from api.auth_endpoints import auth_bp
-from api.email_endpoints import email_bp
-from api.social_endpoints import social_bp
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 def create_app():
-    """Create and configure the Flask app"""
-    app = Flask(__name__)
+    """Create and configure the FastAPI app"""
+    app = FastAPI(
+        title="AgenticFlow API",
+        description="API for AgenticFlow - Automated Email and Social Media Management",
+        version="1.0.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json"
+    )
     
-    # Configure app
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
-    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret')
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600  # 1 hour
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # In production, replace with specific origins
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     
-    # Initialize JWT
-    jwt = JWTManager(app)
+    # Include routers
+    app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
+    app.include_router(email_router, prefix="/api/emails", tags=["emails"])
+    app.include_router(social_router, prefix="/api/social", tags=["social"])
+    app.include_router(newsletter_router, prefix="/api/newsletters", tags=["newsletters"])
     
-    # Initialize CORS
-    CORS(app, resources={
-        r"/*": {
-            "origins": "*",  # In production, replace with specific origins
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+    # Health check endpoint
+    @app.get("/api/health", tags=["health"])
+    async def health_check():
+        return {
+            "status": "ok",
+            "message": "AgenticFlow API is running",
+            "version": "1.0.0"
         }
-    })
-    
-    # Initialize database
-    from database.init_db import init_app
-    init_app(app)
-    
-    # Register blueprints
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(email_bp, url_prefix='/api/emails')
-    app.register_blueprint(social_bp, url_prefix='/api/social')
-    
-    # Simple route for health check
-    @app.route('/')
-    def index():
-        return jsonify({
-            'status': 'ok',
-            'message': 'AgenticFlow API is running',
-            'version': '1.0.0'
-        })
     
     return app
 
-# Create the Flask application
+# Create the FastAPI application
 app = create_app()
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
