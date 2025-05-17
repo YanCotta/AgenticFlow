@@ -1,0 +1,36 @@
+# Core dependencies
+fastapi>=0.68.0
+uvicorn>=0.15.0
+python-dotenv>=0.19.0
+pydantic>=1.8.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.5
+
+# Database
+sqlalchemy>=1.4.0
+alembic>=1.7.0
+psycopg2-binary>=2.9.0
+
+# Email
+email-validator>=1.1.3
+
+# AI/ML
+transformers>=4.0.0
+torch>=1.9.0
+sentence-transformers>=2.0.0
+
+# Utilities
+python-dateutil>=2.8.2
+requests>=2.26.0
+loguru>=0.5.3
+pytest>=6.2.5
+pytest-asyncio>=0.15.1
+httpx>=0.19.0
+
+# Development
+black>=21.9b0
+isort>=5.9.3
+flake8>=3.9.2
+mypy>=0.910
+pre-commit>=2.15.0
