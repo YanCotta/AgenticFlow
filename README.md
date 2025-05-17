@@ -1,6 +1,6 @@
 # AgenticFlow
 
-AgenticFlow is a multi-agent system designed to automate email processing, analysis, and response generation, with additional capabilities for social media management. The system uses AI agents to process incoming emails, generate appropriate responses, and manage social media content.
+AgenticFlow is an advanced multi-agent system that automates email processing, intelligent response generation, and social media content management. Built with Python and leveraging AI, it streamlines communication workflows by intelligently processing incoming emails, generating context-aware responses, and managing social media content distribution.
 
 ## 🚀 Project Status
 
@@ -9,38 +9,71 @@ AgenticFlow is a multi-agent system designed to automate email processing, analy
   - Project structure and virtual environment
   - Git repository initialization with proper .gitignore
   - Environment configuration
+  - Dependency management with requirements.txt
 
 - **Database Models**
   - SQLAlchemy models for all core entities
   - Database initialization and configuration
   - PostgreSQL and SQLite support
+  - Models for emails, newsletters, social posts, and user data
+
+- **Core Agents Implementation**
+  - **EmailFetcher**: Retrieves and filters emails from Gmail
+  - **EmailAnalyzer**: Analyzes email content and extracts key information
+  - **ReplyGenerator**: Generates context-aware email responses
+  - **NewsletterProcessor**: Processes and extracts content from newsletters
+  - **PostFormatter**: Optimizes content for different social media platforms
+  - **SocialPoster**: Manages posting to various social networks
+
+- **Orchestration**
+  - **EmailCrew**: Coordinates email processing workflow
+  - **SocialCrew**: Manages social media content workflow
+  - Centralized orchestration for all agents
 
 ### 🚧 In Progress
-- **Agents Implementation** (Starting Next)
-  - Email fetcher
-  - Email analyzer
-  - Reply generator
-  - Newsletter processor
-  - Social media poster
+- **API Endpoints**
+  - Authentication and user management
+  - Email processing endpoints
+  - Social media management endpoints
+  - Integration with frontend components
 
 ## 📁 Project Structure
 
 ```
 AgenticFlow/
-├── backend/                     # Backend application
-│   ├── agents/                  # AI agent implementations
-│   ├── api/                     # API endpoints
-│   ├── database/                # Database models and migrations
-│   ├── static/                  # Static files
-│   ├── templates/               # HTML templates
-│   ├── utils/                   # Utility functions
-│   ├── .env.example             # Example environment variables
-│   ├── config.py                # Application configuration
-│   ├── main.py                  # Application entry point
-│   └── requirements.txt         # Python dependencies
-├── frontend/                    # Frontend application (To be implemented)
-├── tests/                       # Test suite (To be implemented)
-└── README.md                    # This file
+├── backend/                           # Backend application
+│   ├── agents/                        # AI agent implementations
+│   │   ├── email_fetcher.py          # Fetches and filters emails
+│   │   ├── email_analyzer.py         # Analyzes email content
+│   │   ├── reply_generator.py        # Generates email responses
+│   │   ├── newsletter_processor.py   # Processes newsletter content
+│   │   ├── post_formatter.py         # Formats content for social media
+│   │   └── social_poster.py          # Manages social media posts
+│   │
+│   ├── api/                         # API endpoints
+│   │   ├── __init__.py              
+│   │   ├── auth_endpoints.py       # Authentication endpoints
+│   │   ├── email_endpoints.py       # Email processing endpoints
+│   │   └── social_endpoints.py      # Social media endpoints
+│   │
+│   ├── database/                    # Database models and migrations
+│   │   ├── __init__.py
+│   │   ├── models.py               # SQLAlchemy models
+│   │   └── init_db.py              # Database initialization
+│   │
+│   ├── utils/                       # Utility functions
+│   │   ├── gmail_integration.py    # Gmail API integration
+│   │   └── social_integration.py   # Social media API integrations
+│   │
+│   ├── .env.example                # Example environment variables
+│   ├── config.py                   # Application configuration
+│   ├── main.py                     # Application entry point
+│   ├── orchestrator.py             # Agent orchestration
+│   └── requirements.txt            # Python dependencies
+│
+├── frontend/                      # Frontend application (Coming Soon)
+├── tests/                         # Test suite
+└── README.md                      # This file
 ```
 
 ## 🛠️ Setup and Installation
@@ -105,17 +138,38 @@ Once the server is running, you can access:
 - API Documentation: `http://localhost:5000/api/docs`
 - Health Check: `http://localhost:5000/health`
 
-## 🤖 Agents Overview
+## 🤖 Agents & Workflows
 
-### Implemented Agents
-- None yet
+### Core Agents
 
-### Upcoming Agents
-- Email Fetcher: Fetches emails from configured accounts
-- Email Analyzer: Analyzes email content and extracts key information
-- Reply Generator: Generates context-aware email replies
-- Newsletter Processor: Extracts and processes newsletter content
-- Social Media Poster: Manages social media posts
+#### Email Processing
+- **EmailFetcher**: Retrieves and filters unread emails from Gmail using the Gmail API
+- **EmailAnalyzer**: Analyzes email content, extracts key information, and categorizes emails
+- **ReplyGenerator**: Generates context-aware email responses using AI
+
+#### Social Media Management
+- **NewsletterProcessor**: Extracts and structures content from newsletters
+- **PostFormatter**: Optimizes content for different social media platforms
+- **SocialPoster**: Handles authentication and posting to various social networks
+
+### Workflow Orchestration
+
+#### EmailCrew
+1. Fetches unread emails
+2. Analyzes and categorizes emails
+3. Generates draft replies when needed
+
+#### SocialCrew
+1. Processes newsletter content
+2. Formats content for different platforms
+3. Schedules and posts content
+
+### Features
+- **AI-Powered Processing**: Leverages OpenAI's models for content understanding
+- **Multi-Platform Support**: Works with Gmail, Twitter, LinkedIn, and more
+- **Asynchronous Processing**: Efficient handling of multiple tasks
+- **Extensible Architecture**: Easy to add new agents and workflows
+- **Secure Authentication**: JWT-based authentication for API access
 
 ## 🔒 Authentication
 
@@ -145,7 +199,19 @@ Project Link: [https://github.com/YanCotta/AgenticFlow](https://github.com/YanCo
 
 ## 📝 Changelog
 
-### [0.1.0] - 2025-05-17
+### [0.2.0] - 2025-05-17
+#### Added
+- Implemented all core agents (EmailFetcher, EmailAnalyzer, ReplyGenerator, etc.)
+- Added workflow orchestration with CrewAI
+- Integrated OpenAI for content processing
+- Added Gmail and social media API integrations
+- Implemented database models for all entities
+- Added configuration management
+- Comprehensive error handling and logging
+- Asynchronous task processing
+- Unit tests for core functionality
+
+### [0.1.0] - 2025-05-16
 #### Added
 - Initial project setup
 - Database models and configuration
