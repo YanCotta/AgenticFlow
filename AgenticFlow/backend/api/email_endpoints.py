@@ -369,14 +369,292 @@ async def search_emails(
             detail="Error searching emails"
         )
 
-@router.get("/{email_id}", response_model=Email)
+@router.get("/{email_id}", response_model=EmailResponse)
 async def get_email(
     email_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Get a specific email by ID."""
+    """
+    Get a specific email by ID.
+    
+    Args:
+        email_id: The ID of the email to retrieve
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        The requested email
+    """
     try:
+        email = await get_email_or_404(db, email_id)
+        
+        # Verify ownership
+        if email.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this email"
+            )
+            
+        # Mark as read if not already
+        if not email.is_read:
+            email.is_read = True
+            email.read_at = datetime.utcnow()
+            db.commit()
+            db.refresh(email)
+            
+        return email
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving email {email_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving email"
+        )
+
+@router.post("/{email_id}/analyze", response_model=EmailAnalysis)
+async def analyze_email(
+    email_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Analyze an email's content.
+    
+    Args:
+        email_id: The ID of the email to analyze
+        background_tasks: Background tasks handler
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        Analysis results
+    """
+    try:
+        email = await get_email_or_404(db, email_id)
+        
+        # Verify ownership
+        if email.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this email"
+            )
+        
+        # Check if analysis already exists
+        analysis = db.query(DBAnalysis).filter(
+            DBAnalysis.email_id == email_id,
+            DBAnalysis.user_id == current_user.id
+        ).first()
+        
+        if analysis:
+            return analysis
+            
+        # Create a new analysis in the database
+        analysis = DBAnalysis(
+            email_id=email_id,
+            user_id=current_user.id,
+            status="pending"
+        )
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+        
+        # Process analysis in background
+        background_tasks.add_task(
+            process_email_analysis,
+            db=db,
+            email=email,
+            analysis_id=analysis.id
+        )
+        
+        return analysis
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing email {email_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error analyzing email"
+        )
+
+@router.post("/{email_id}/draft-reply", response_model=DraftReply)
+async def draft_email_reply(
+    email_id: str,
+    tone: str = "professional",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Generate a draft reply for an email.
+    
+    Args:
+        email_id: The ID of the email to reply to
+        tone: The tone to use for the reply (e.g., professional, friendly, concise)
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        A draft reply
+    """
+    try:
+        email = await get_email_or_404(db, email_id)
+        
+        # Verify ownership
+        if email.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this email"
+            )
+        
+        # Generate reply using AI
+        reply = await reply_generator.generate_reply(
+            email=email,
+            tone=tone,
+            user_context={
+                "name": current_user.full_name,
+                "email": current_user.email,
+                "preferences": current_user.preferences or {}
+            }
+        )
+        
+        # Create draft reply
+        draft = DraftReply(
+            email_id=email_id,
+            subject=f"Re: {email.subject}",
+            body=reply["content"],
+            tone=tone,
+            context_used=reply.get("context_used", [])
+        )
+        
+        return draft
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating draft reply for email {email_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error generating draft reply"
+        )
+
+@router.post("/{email_id}/send-reply", status_code=status.HTTP_202_ACCEPTED)
+async def send_email_reply(
+    email_id: str,
+    request: SendReplyRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Send a reply to an email.
+    
+    Args:
+        email_id: The ID of the email to reply to
+        request: The reply request containing the draft and scheduling options
+        background_tasks: Background tasks handler
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        Confirmation of the scheduled send
+    """
+    try:
+        email = await get_email_or_404(db, email_id)
+        
+        # Verify ownership
+        if email.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this email"
+            )
+        
+        # Schedule the email to be sent
+        background_tasks.add_task(
+            send_email_reply_task,
+            db=db,
+            email=email,
+            draft=request.draft_reply,
+            schedule_send=request.schedule_send,
+            user_id=current_user.id
+        )
+        
+        return {"status": "accepted", "message": "Reply is being processed"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending reply for email {email_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error sending reply"
+        )
+
+# Background tasks
+async def process_email_analysis(
+    db: Session,
+    email: Email,
+    analysis_id: int
+):
+    """Background task to process email analysis."""
+    try:
+        # Update status to processing
+        analysis = db.query(DBAnalysis).get(analysis_id)
+        if not analysis:
+            logger.error(f"Analysis {analysis_id} not found")
+            return
+            
+        analysis.status = "processing"
+        db.commit()
+        
+        # Analyze the email
+        analysis_result = await email_analyzer.analyze_email(email)
+        
+        # Update analysis with results
+        for field, value in analysis_result.dict().items():
+            setattr(analysis, field, value)
+            
+        analysis.status = "completed"
+        analysis.completed_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"Completed analysis for email {email.id}")
+        
+    except Exception as e:
+        logger.error(f"Error in process_email_analysis: {str(e)}", exc_info=True)
+        if analysis:
+            analysis.status = "failed"
+            analysis.error = str(e)
+            db.commit()
+
+async def send_email_reply_task(
+    db: Session,
+    email: Email,
+    draft: Dict[str, Any],
+    schedule_send: Optional[datetime],
+    user_id: int
+):
+    """Background task to send an email reply."""
+    try:
+        # If scheduled for later, wait until the scheduled time
+        if schedule_send and schedule_send > datetime.utcnow():
+            await asyncio.sleep((schedule_send - datetime.utcnow()).total_seconds())
+        
+        # Send the email
+        # In a real implementation, this would use an email service
+        logger.info(f"Sending email reply from user {user_id} to {email.from_email}")
+        
+        # Update the email status
+        email.replied_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"Successfully sent reply for email {email.id}")
+        
+    except Exception as e:
+        logger.error(f"Error in send_email_reply_task: {str(e)}", exc_info=True)
         email = await email_fetcher.fetch_email(email_id)
         if not email:
             raise HTTPException(
