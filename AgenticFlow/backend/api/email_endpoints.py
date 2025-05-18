@@ -190,6 +190,89 @@ async def get_email_or_404(db: Session, email_id: str) -> Email:
     return email
 
 # Routes
+@router.get("/summaries", response_model=List[Dict[str, Any]])
+async def get_email_summaries(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get email summaries with pagination.
+    
+    Args:
+        skip: Number of items to skip
+        limit: Maximum number of items to return
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        List of email summaries with basic information
+    """
+    try:
+        # Get emails with pagination
+        emails = db.query(Email).filter(
+            Email.user_id == current_user.id
+        ).order_by(
+            Email.received_at.desc()
+        ).offset(skip).limit(limit).all()
+        
+        # Format summaries
+        summaries = [{
+            "id": email.id,
+            "subject": email.subject,
+            "from_email": email.from_email,
+            "received_at": email.received_at.isoformat(),
+            "summary": email.analyses[0].summary if email.analyses else "No summary available",
+            "requires_response": any(a.requires_response for a in email.analyses) if email.analyses else False,
+            "priority": email.analyses[0].priority if email.analyses else "normal"
+        } for email in emails]
+        
+        return summaries
+        
+    except Exception as e:
+        logger.error(f"Error fetching email summaries: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error fetching email summaries"
+        )
+
+@router.post("/replies/approve/{reply_id}", response_model=Dict[str, Any])
+async def approve_reply(
+    reply_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Approve a draft reply.
+    
+    Args:
+        reply_id: ID of the reply to approve
+        db: Database session
+        current_user: Authenticated user
+        
+    Returns:
+        Confirmation of approval
+    """
+    try:
+        # In a real implementation, this would update the reply status
+        # and potentially trigger sending the email
+        logger.info(f"Approving reply {reply_id} for user {current_user.id}")
+        
+        return {
+            "status": "approved",
+            "reply_id": reply_id,
+            "approved_at": datetime.utcnow().isoformat(),
+            "approved_by": current_user.email
+        }
+        
+    except Exception as e:
+        logger.error(f"Error approving reply {reply_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error approving reply: {str(e)}"
+        )
+
 @router.get("/", response_model=EmailListResponse)
 async def list_emails(
     db: Session = Depends(get_db),
